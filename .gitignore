@@ -1,0 +1,12 @@
+/agents.md
+/.context
+/.bundle
+/pkg
+/gems.locked
+/.covered.db
+/external
+
+/ext/teapot
+/lib/Protocol_HTTP3.*
+compile_commands.json
+.cache

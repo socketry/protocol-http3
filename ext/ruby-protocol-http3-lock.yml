@@ -1,0 +1,79 @@
+---
+platforms:
+  :commit: 53bfdd34201790980ba8f4c335dbf659d038eb06
+  :branch: master
+build-make:
+  :commit: 50998307f3d1f462c2bda1999b42b2ea8aeb4b15
+  :branch: master
+build-cmake:
+  :commit: 6558fdad5bbb475f0fa5584ff773de8f12ff232e
+  :branch: master
+protocol-http3:
+  :commit: d9e1c8bc9cb301d430fb48c3aec3b938a6446277
+  :branch: main
+ruby:
+  :commit: 685cdd5a421dae7749f368d08add9aa9709ad043
+  :branch: main
+generate-template:
+  :commit: ad0dcfb6da64cc0508b71916b30e1050c82ecea7
+  :branch: master
+generate-cpp-class:
+  :commit: b8996bd1404904a737b76d6893fc9f9bf78da540
+  :branch: master
+build-compile-commands:
+  :commit: 1c4b18f86d45426d7dd284c28bc53837e5694b6c
+  :branch: main
+variants:
+  :commit: f6a26a8ac3a47a23a213cbd15da2183239d394d1
+  :branch: master
+platform-darwin-osx:
+  :commit: dbd14d21c11e85f6fc067529a63f81cf5e6604d2
+  :branch: master
+platform-darwin-ios:
+  :commit: d0611a1afac738012ffb7c51185499292e9a87ba
+  :branch: master
+build-clang:
+  :commit: 1c9be15a63c149f6decf8d0599b34755aa3b0979
+  :branch: master
+build-darwin:
+  :commit: 0d68478a7754741dd5d360f70294161efdee030d
+  :branch: master
+build-files:
+  :commit: 2e5392ef4e171885b621288c7829e5160f1255bf
+  :branch: master
+executor-unix:
+  :commit: 91f433a59550b826f7bc69e36d1df9c6e5576575
+  :branch: master
+executor-lldb:
+  :commit: 193ba0b15c532d2745b0f0bfb05cd9581e869555
+  :branch: master
+protocol-quic:
+  :commit: 9900a7fe0407a2a4ae0a8e0508d6ad8d52f66c27
+  :branch: main
+scheduler:
+  :commit: 55191d4c552626c26e5772f2b9a48d58306241f9
+  :branch: main
+nghttp3:
+  :commit: 922c2aaca406840a63ce2c4a808d9c888538671d
+  :branch: main
+ngtcp2:
+  :commit: c65334b60a04200b1691da3d85d38444c5ff951d
+  :branch: main
+concurrent:
+  :commit: 5075d0f6c2c0e90dc152265ec5e236d56fd20c94
+  :branch: master
+time:
+  :commit: c1ec0bb4fc9abca3de559a87884bdbc1413b3f1f
+  :branch: main
+picotls:
+  :commit: 2bc03af57a8ea09f3b0bd11c47c876fd3bc1d9fc
+  :branch: main
+coroutine:
+  :commit: 428204db9f5485d1565884c218933fd16833b439
+  :branch: master
+openssl:
+  :commit: 2f48d686aaaf20dc6d7e8a277803657eb5951530
+  :branch: main
+coroutine-arm64:
+  :commit: aada7d279a6c2ae79b6f8f3e45cfa44de3c432fe
+  :branch: master

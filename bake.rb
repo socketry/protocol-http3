@@ -1,0 +1,32 @@
+# frozen_string_literal: true
+
+# Released under the MIT License.
+# Copyright, 2023-2026, by Samuel Williams.
+
+# Update the project documentation with the new version number.
+#
+# @parameter version [String] The new version number.
+def after_gem_release_version_increment(version)
+	context["releases:update"].call(version)
+	context["utopia:project:update"].call
+end
+
+# Create a GitHub release for the given tag.
+#
+# @parameter tag [String] The tag to create a release for.
+def after_gem_release(tag:, **options)
+	context["releases:github:release"].call(tag)
+end
+
+def build
+	ext_path = File.expand_path("ext", __dir__)
+	
+	Dir.chdir(ext_path) do
+		system("teapot", "fetch")
+		system("teapot", "Ruby/Protocol/HTTP3")
+	end
+end
+
+def before_test
+	build
+end
