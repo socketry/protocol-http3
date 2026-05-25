@@ -80,3 +80,12 @@ coroutine-arm64:
 scheduler-ruby:
   :commit: 94e524e64912081aaa5a8cb54bad7ad73f01a51a
   :branch: main
+platform-linux:
+  :commit: c3c5cbf90d26d23c6137def781cd997ddca5e51a
+  :branch: master
+build-linux:
+  :commit: cbc8c52c2ca2fc75761e545c83429ef34e4cd4fe
+  :branch: master
+coroutine-amd64:
+  :commit: 27aee56aa1414094584e7b2d8b74e289ecad4c86
+  :branch: master
