@@ -8,4 +8,4 @@ require "protocol/quic"
 require_relative "http3/version"
 
 # Native extension:
-require "Protocol_HTTP3"
+require "Ruby_Protocol_HTTP3"

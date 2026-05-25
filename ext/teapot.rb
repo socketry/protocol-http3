@@ -21,7 +21,7 @@ define_target "ruby-protocol-http3" do |target|
 	target.provides "Ruby/Protocol/HTTP3" do
 		source_root = target.package.path + "source"
 		
-		library_path = build dynamic_library: "Protocol_HTTP3", source_files: source_root.glob("**/*.{c,cpp}")
+		library_path = build dynamic_library: "Ruby_Protocol_HTTP3", source_files: source_root.glob("**/*.{c,cpp}")
 		
 		copy source: [library_path], prefix: environment[:ruby_install_path]
 		
