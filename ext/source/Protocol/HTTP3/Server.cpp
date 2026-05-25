@@ -9,7 +9,7 @@
 
 VALUE Protocol_HTTP3_Server = Qnil;
 
-class RubyServer : public Protocol::HTTP3::Server {
+class RubyHTTP3Server : public Protocol::HTTP3::Server {
 public:
 	VALUE self;
 
@@ -22,7 +22,7 @@ private:
 	std::unordered_map<Protocol::QUIC::StreamID, VALUE> _streams;
 
 public:
-	RubyServer(VALUE self, VALUE dispatcher, VALUE configuration, VALUE tls_context, VALUE socket, VALUE remote_address, VALUE packet_header, VALUE original_connection_id) :
+	RubyHTTP3Server(VALUE self, VALUE dispatcher, VALUE configuration, VALUE tls_context, VALUE socket, VALUE remote_address, VALUE packet_header, VALUE original_connection_id) :
 		Protocol::HTTP3::Server(*Protocol_HTTP3_Dispatcher_get(dispatcher), *Protocol_QUIC_Configuration_get(configuration), *Protocol_QUIC_TLS_ServerContext_get(tls_context), *Protocol_QUIC_Socket_get(socket), *Protocol_QUIC_Address_get(remote_address), *Protocol_QUIC_PacketHeader_get(packet_header), nullptr),
 		self(self),
 		_dispatcher(dispatcher),
@@ -34,7 +34,7 @@ public:
 		(void)original_connection_id;
 	}
 
-	virtual ~RubyServer()
+	virtual ~RubyHTTP3Server()
 	{
 	}
 
@@ -128,14 +128,14 @@ public:
 static void Protocol_HTTP3_Server_mark(void *data)
 {
 	if (data) {
-		reinterpret_cast<RubyServer *>(data)->mark();
+		reinterpret_cast<RubyHTTP3Server *>(data)->mark();
 	}
 }
 
 static void Protocol_HTTP3_Server_compact(void *data)
 {
 	if (data) {
-		reinterpret_cast<RubyServer *>(data)->compact();
+		reinterpret_cast<RubyHTTP3Server *>(data)->compact();
 	}
 }
 
@@ -148,7 +148,7 @@ static void Protocol_HTTP3_Server_free(void *data)
 
 static size_t Protocol_HTTP3_Server_size(const void *data)
 {
-	return sizeof(RubyServer);
+	return sizeof(RubyHTTP3Server);
 }
 
 static const rb_data_type_t Protocol_HTTP3_Server_type = {
@@ -179,7 +179,7 @@ static VALUE Protocol_HTTP3_Server_allocate(VALUE klass)
 
 static VALUE Protocol_HTTP3_Server_initialize(VALUE self, VALUE dispatcher, VALUE configuration, VALUE tls_context, VALUE socket, VALUE remote_address, VALUE packet_header, VALUE original_connection_id)
 {
-	DATA_PTR(self) = new RubyServer(self, dispatcher, configuration, tls_context, socket, remote_address, packet_header, original_connection_id);
+	DATA_PTR(self) = new RubyHTTP3Server(self, dispatcher, configuration, tls_context, socket, remote_address, packet_header, original_connection_id);
 
 	return self;
 }

@@ -1,6 +1,5 @@
 #include "Dispatcher.hpp"
 
-#include "Reference.hpp"
 #include "Server.hpp"
 
 #include "../QUIC/Bindings.hpp"
@@ -12,7 +11,7 @@
 
 VALUE Protocol_HTTP3_Dispatcher = Qnil;
 
-class RubyDispatcher final : public Protocol::QUIC::Dispatcher {
+class RubyHTTP3Dispatcher final : public Protocol::QUIC::Dispatcher {
 public:
 	VALUE self;
 
@@ -23,7 +22,7 @@ private:
 	std::unordered_map<Protocol::QUIC::Socket *, VALUE> _sockets;
 
 public:
-	RubyDispatcher(VALUE self, VALUE configuration, VALUE tls_context) :
+	RubyHTTP3Dispatcher(VALUE self, VALUE configuration, VALUE tls_context) :
 		Protocol::QUIC::Dispatcher(*Protocol_QUIC_Configuration_get(configuration), *Protocol_QUIC_TLS_ServerContext_get(tls_context)),
 		self(self),
 		_configuration(configuration),
@@ -125,7 +124,7 @@ public:
 		VALUE ruby_address = Protocol_QUIC_Address_wrap(Protocol_QUIC_Address, address);
 
 		VALUE ruby_packet_header = Protocol_QUIC_PacketHeader_allocate(Protocol_QUIC_PacketHeader);
-		ValueReference ruby_packet_header_reference(ruby_packet_header, packet_header);
+		DATA_PTR(ruby_packet_header) = new ngtcp2_pkt_hd(packet_header);
 
 		VALUE server = rb_funcall(self, rb_intern("create_server"), 3, ruby_socket, ruby_address, ruby_packet_header);
 		auto native_server = Protocol_HTTP3_Server_get(server);
@@ -179,14 +178,14 @@ public:
 static void Protocol_HTTP3_Dispatcher_mark(void *data)
 {
 	if (data) {
-		reinterpret_cast<RubyDispatcher *>(data)->mark();
+		reinterpret_cast<RubyHTTP3Dispatcher *>(data)->mark();
 	}
 }
 
 static void Protocol_HTTP3_Dispatcher_compact(void *data)
 {
 	if (data) {
-		reinterpret_cast<RubyDispatcher *>(data)->compact();
+		reinterpret_cast<RubyHTTP3Dispatcher *>(data)->compact();
 	}
 }
 
@@ -199,7 +198,7 @@ static void Protocol_HTTP3_Dispatcher_free(void *data)
 
 static size_t Protocol_HTTP3_Dispatcher_size(const void *data)
 {
-	return sizeof(RubyDispatcher);
+	return sizeof(RubyHTTP3Dispatcher);
 }
 
 static const rb_data_type_t Protocol_HTTP3_Dispatcher_type = {
@@ -230,35 +229,35 @@ static VALUE Protocol_HTTP3_Dispatcher_allocate(VALUE klass)
 
 static VALUE Protocol_HTTP3_Dispatcher_initialize(VALUE self, VALUE configuration, VALUE tls_context)
 {
-	DATA_PTR(self) = new RubyDispatcher(self, configuration, tls_context);
+	DATA_PTR(self) = new RubyHTTP3Dispatcher(self, configuration, tls_context);
 
 	return self;
 }
 
 static VALUE Protocol_HTTP3_Dispatcher_configuration(VALUE self)
 {
-	auto dispatcher = dynamic_cast<RubyDispatcher *>(Protocol_HTTP3_Dispatcher_get(self));
+	auto dispatcher = dynamic_cast<RubyHTTP3Dispatcher *>(Protocol_HTTP3_Dispatcher_get(self));
 
 	return dispatcher->ruby_configuration();
 }
 
 static VALUE Protocol_HTTP3_Dispatcher_tls_context(VALUE self)
 {
-	auto dispatcher = dynamic_cast<RubyDispatcher *>(Protocol_HTTP3_Dispatcher_get(self));
+	auto dispatcher = dynamic_cast<RubyHTTP3Dispatcher *>(Protocol_HTTP3_Dispatcher_get(self));
 
 	return dispatcher->ruby_tls_context();
 }
 
 static VALUE Protocol_HTTP3_Dispatcher_listen(VALUE self, VALUE socket)
 {
-	auto dispatcher = dynamic_cast<RubyDispatcher *>(Protocol_HTTP3_Dispatcher_get(self));
+	auto dispatcher = dynamic_cast<RubyHTTP3Dispatcher *>(Protocol_HTTP3_Dispatcher_get(self));
 
 	return dispatcher->listen(socket);
 }
 
 static VALUE Protocol_HTTP3_Dispatcher_receive(VALUE self, VALUE socket)
 {
-	auto dispatcher = dynamic_cast<RubyDispatcher *>(Protocol_HTTP3_Dispatcher_get(self));
+	auto dispatcher = dynamic_cast<RubyHTTP3Dispatcher *>(Protocol_HTTP3_Dispatcher_get(self));
 
 	return dispatcher->receive(socket);
 }

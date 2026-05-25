@@ -12,7 +12,7 @@
 
 VALUE Protocol_HTTP3_Client = Qnil;
 
-class RubyClient final : public Protocol::QUIC::Client, public Protocol::HTTP3::Session {
+class RubyHTTP3Client final : public Protocol::QUIC::Client, public Protocol::HTTP3::Session {
 public:
 	VALUE self;
 
@@ -24,7 +24,7 @@ private:
 	std::unordered_map<Protocol::QUIC::StreamID, VALUE> _streams;
 
 public:
-	RubyClient(VALUE self, VALUE configuration, VALUE tls_context, VALUE socket, VALUE remote_address, VALUE chosen_version) :
+	RubyHTTP3Client(VALUE self, VALUE configuration, VALUE tls_context, VALUE socket, VALUE remote_address, VALUE chosen_version) :
 		Protocol::QUIC::Client(*Protocol_QUIC_Configuration_get(configuration), *Protocol_QUIC_TLS_ClientContext_get(tls_context), *Protocol_QUIC_Socket_get(socket), *Protocol_QUIC_Address_get(remote_address), RB_NUM2UINT(chosen_version)),
 		Protocol::HTTP3::Session(Protocol::HTTP3::Session::Role::CLIENT),
 		self(self),
@@ -200,14 +200,14 @@ public:
 static void Protocol_HTTP3_Client_mark(void *data)
 {
 	if (data) {
-		reinterpret_cast<RubyClient *>(data)->mark();
+		reinterpret_cast<RubyHTTP3Client *>(data)->mark();
 	}
 }
 
 static void Protocol_HTTP3_Client_compact(void *data)
 {
 	if (data) {
-		reinterpret_cast<RubyClient *>(data)->compact();
+		reinterpret_cast<RubyHTTP3Client *>(data)->compact();
 	}
 }
 
@@ -220,7 +220,7 @@ static void Protocol_HTTP3_Client_free(void *data)
 
 static size_t Protocol_HTTP3_Client_size(const void *data)
 {
-	return sizeof(RubyClient);
+	return sizeof(RubyHTTP3Client);
 }
 
 static const rb_data_type_t Protocol_HTTP3_Client_type = {
@@ -245,9 +245,9 @@ Protocol::QUIC::Client * Protocol_HTTP3_Client_get(VALUE self)
 	return client;
 }
 
-static RubyClient * Protocol_HTTP3_RubyClient_get(VALUE self)
+static RubyHTTP3Client * Protocol_HTTP3_RubyHTTP3Client_get(VALUE self)
 {
-	return dynamic_cast<RubyClient *>(Protocol_HTTP3_Client_get(self));
+	return dynamic_cast<RubyHTTP3Client *>(Protocol_HTTP3_Client_get(self));
 }
 
 static VALUE Protocol_HTTP3_Client_allocate(VALUE klass)
@@ -257,7 +257,7 @@ static VALUE Protocol_HTTP3_Client_allocate(VALUE klass)
 
 static VALUE Protocol_HTTP3_Client_initialize(VALUE self, VALUE configuration, VALUE tls_context, VALUE socket, VALUE remote_address, VALUE chosen_version)
 {
-	DATA_PTR(self) = new RubyClient(self, configuration, tls_context, socket, remote_address, chosen_version);
+	DATA_PTR(self) = new RubyHTTP3Client(self, configuration, tls_context, socket, remote_address, chosen_version);
 
 	return self;
 }
@@ -349,7 +349,7 @@ static VALUE Protocol_HTTP3_Client_receive(VALUE self, VALUE ruby_socket)
 
 static VALUE Protocol_HTTP3_Client_submit_request(VALUE self, VALUE headers)
 {
-	auto client = Protocol_HTTP3_RubyClient_get(self);
+	auto client = Protocol_HTTP3_RubyHTTP3Client_get(self);
 	auto stream = client->open_bidirectional_stream();
 	auto stream_id = stream->stream_id();
 	auto count = RARRAY_LEN(headers);
