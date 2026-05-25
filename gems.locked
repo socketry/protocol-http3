@@ -2,7 +2,7 @@ PATH
   remote: .
   specs:
     protocol-http3 (0.0.1)
-      protocol-quic (~> 0.0.4)
+      protocol-quic (~> 0.0.5)
       rake
       teapot (~> 3.5)
 
