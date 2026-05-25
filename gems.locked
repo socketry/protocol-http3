@@ -1,17 +1,8 @@
-GIT
-  remote: https://github.com/socketry/protocol-quic.git
-  revision: 8a8a8d39d3a5a315dd6e6e2912903de98a116d2e
-  specs:
-    protocol-quic (0.0.1)
-      rake
-      rugged (~> 1.0)
-      teapot (~> 3.5)
-
 PATH
   remote: .
   specs:
     protocol-http3 (0.0.1)
-      protocol-quic
+      protocol-quic (~> 0.0.3)
       rake
       teapot (~> 3.5)
 
@@ -107,7 +98,7 @@ GEM
       prism
       rbs
     erb (6.0.4)
-    falcon (0.55.3)
+    falcon (0.55.4)
       async
       async-container (~> 0.20)
       async-http (~> 0.75)
@@ -189,6 +180,9 @@ GEM
     protocol-http2 (0.26.0)
       protocol-hpack (~> 1.4)
       protocol-http (~> 0.62)
+    protocol-quic (0.0.3)
+      rake
+      teapot (~> 3.5)
     protocol-rack (0.22.1)
       io-stream (>= 0.10)
       protocol-http (~> 0.58)
@@ -307,7 +301,6 @@ DEPENDENCIES
   covered
   decode
   protocol-http3!
-  protocol-quic!
   rubocop
   rubocop-md
   rubocop-socketry

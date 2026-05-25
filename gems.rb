@@ -7,7 +7,6 @@ source "https://rubygems.org"
 
 gemspec
 
-gem "protocol-quic", git: "https://github.com/socketry/protocol-quic.git"
 gem "teapot"
 
 group :maintenance, optional: true do
