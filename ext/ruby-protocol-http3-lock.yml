@@ -48,10 +48,10 @@ executor-lldb:
   :commit: 193ba0b15c532d2745b0f0bfb05cd9581e869555
   :branch: master
 protocol-quic:
-  :commit: 9900a7fe0407a2a4ae0a8e0508d6ad8d52f66c27
+  :commit: 1328f66a91ba7b3e544304dde8ba7bc93d3462ec
   :branch: main
 scheduler:
-  :commit: 55191d4c552626c26e5772f2b9a48d58306241f9
+  :commit: 4d05a1631ac749106d268bda07425bf6ce0476dc
   :branch: main
 nghttp3:
   :commit: 922c2aaca406840a63ce2c4a808d9c888538671d
@@ -78,5 +78,5 @@ coroutine-arm64:
   :commit: aada7d279a6c2ae79b6f8f3e45cfa44de3c432fe
   :branch: master
 scheduler-ruby:
-  :commit: 8e4e36bfd47485e8379b3d9c0e4258dec63b7320
+  :commit: 94e524e64912081aaa5a8cb54bad7ad73f01a51a
   :branch: main
