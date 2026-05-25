@@ -1,6 +1,6 @@
 GIT
   remote: https://github.com/socketry/protocol-quic.git
-  revision: 66b17e3bc4882f9e53c47d3e56571395e7110dbc
+  revision: 05b9bac366d0cb983c7eee14a21ad465ca4da19b
   specs:
     protocol-quic (0.0.1)
       rake
