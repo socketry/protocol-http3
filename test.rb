@@ -5,22 +5,18 @@
 # Copyright, 2026, by Samuel Williams.
 
 $LOAD_PATH.unshift(File.expand_path("lib", __dir__))
+$LOAD_PATH.unshift(File.expand_path("fixtures", __dir__))
 
-require "protocol/http3"
+require "protocol/http3/client_server"
 
-configuration = Protocol::QUIC::Configuration.new
-server_context = Protocol::QUIC::TLS::ServerContext.new
-server_context.add_protocol("h3")
+result = Protocol::HTTP3::Fixtures.exchange
 
-dispatcher = Protocol::HTTP3::Dispatcher.new(configuration, server_context)
+unless result[:request_headers].include?([":method", "GET"])
+	abort "Request headers did not include GET method: #{result[:request_headers].inspect}"
+end
 
-abort "Configuration mismatch" unless dispatcher.configuration.equal?(configuration)
-abort "TLS context mismatch" unless dispatcher.tls_context.equal?(server_context)
+unless result[:response_headers].include?([":status", "200"])
+	abort "Response headers did not include 200 status: #{result[:response_headers].inspect}"
+end
 
-GC.start
-GC.compact
-
-abort "Configuration mismatch after compaction" unless dispatcher.configuration.equal?(configuration)
-abort "TLS context mismatch after compaction" unless dispatcher.tls_context.equal?(server_context)
-
-$stderr.puts "Completed HTTP/3 dispatcher smoke test"
+$stderr.puts "Completed HTTP/3 client/server exchange"

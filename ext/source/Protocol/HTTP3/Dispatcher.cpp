@@ -5,6 +5,9 @@
 
 #include "../QUIC/Bindings.hpp"
 
+#include <array>
+#include <cerrno>
+#include <sys/socket.h>
 #include <unordered_map>
 
 VALUE Protocol_HTTP3_Dispatcher = Qnil;
@@ -31,13 +34,83 @@ public:
 	VALUE ruby_configuration() noexcept {return _configuration;}
 	VALUE ruby_tls_context() noexcept {return _tls_context;}
 
-	Protocol::QUIC::Server * listen(VALUE ruby_socket)
+	VALUE listen(VALUE ruby_socket)
 	{
 		auto socket = Protocol_QUIC_Socket_get(ruby_socket);
 
 		_sockets[socket] = ruby_socket;
 
-		return Protocol::QUIC::Dispatcher::listen(*socket);
+		auto server = Protocol::QUIC::Dispatcher::listen(*socket);
+
+		if (server) {
+			auto iterator = _servers.find(static_cast<Protocol::HTTP3::Server *>(server));
+
+			if (iterator == _servers.end()) {
+				rb_raise(rb_eRuntimeError, "Could not find Ruby server wrapper for native server.");
+			}
+
+			return iterator->second;
+		}
+
+		return Qnil;
+	}
+
+	VALUE receive(VALUE ruby_socket)
+	{
+		auto socket = Protocol_QUIC_Socket_get(ruby_socket);
+		_sockets[socket] = ruby_socket;
+
+		std::array<Protocol::QUIC::Byte, 1024*64> buffer;
+		Protocol::QUIC::Address remote_address;
+
+		iovec vector{
+			.iov_base = buffer.data(),
+			.iov_len = buffer.size(),
+		};
+
+		msghdr message{
+			.msg_name = &remote_address.data,
+			.msg_namelen = sizeof(remote_address.data),
+			.msg_iov = &vector,
+			.msg_iovlen = 1,
+		};
+
+		auto length = recvmsg(socket->descriptor(), &message, MSG_DONTWAIT);
+
+		if (length == -1) {
+			if (errno == EAGAIN || errno == EWOULDBLOCK) {
+				return Qnil;
+			}
+
+			rb_sys_fail("recvmsg");
+		}
+
+		remote_address.length = message.msg_namelen;
+
+		ngtcp2_version_cid version_cid;
+		auto result = ngtcp2_pkt_decode_version_cid(&version_cid, buffer.data(), length, Protocol::QUIC::DEFAULT_SCID_LENGTH);
+
+		if (result == 0) {
+			auto server = process_packet(*socket, remote_address, buffer.data(), length, Protocol::QUIC::ECN::UNSPECIFIED, version_cid);
+
+			if (server) {
+				auto iterator = _servers.find(static_cast<Protocol::HTTP3::Server *>(server));
+
+				if (iterator == _servers.end()) {
+					rb_raise(rb_eRuntimeError, "Could not find Ruby server wrapper for native server.");
+				}
+
+				return iterator->second;
+			}
+		}
+		else if (result == NGTCP2_ERR_VERSION_NEGOTIATION) {
+			send_version_negotiation(*socket, version_cid, remote_address);
+		}
+		else {
+			rb_raise(rb_eRuntimeError, "Could not decode QUIC version/CID: %s", ngtcp2_strerror(result));
+		}
+
+		return Qnil;
 	}
 
 	Protocol::QUIC::Server * create_server(Protocol::QUIC::Socket & socket, const Protocol::QUIC::Address & address, const ngtcp2_pkt_hd & packet_header) override
@@ -180,9 +253,14 @@ static VALUE Protocol_HTTP3_Dispatcher_listen(VALUE self, VALUE socket)
 {
 	auto dispatcher = dynamic_cast<RubyDispatcher *>(Protocol_HTTP3_Dispatcher_get(self));
 
-	dispatcher->listen(socket);
+	return dispatcher->listen(socket);
+}
 
-	return Qnil;
+static VALUE Protocol_HTTP3_Dispatcher_receive(VALUE self, VALUE socket)
+{
+	auto dispatcher = dynamic_cast<RubyDispatcher *>(Protocol_HTTP3_Dispatcher_get(self));
+
+	return dispatcher->receive(socket);
 }
 
 void Init_Protocol_HTTP3_Dispatcher(VALUE Protocol_HTTP3)
@@ -196,4 +274,5 @@ void Init_Protocol_HTTP3_Dispatcher(VALUE Protocol_HTTP3)
 	rb_define_method(Protocol_HTTP3_Dispatcher, "tls_context", Protocol_HTTP3_Dispatcher_tls_context, 0);
 
 	rb_define_method(Protocol_HTTP3_Dispatcher, "listen", Protocol_HTTP3_Dispatcher_listen, 1);
+	rb_define_method(Protocol_HTTP3_Dispatcher, "receive", Protocol_HTTP3_Dispatcher_receive, 1);
 }

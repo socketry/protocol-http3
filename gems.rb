@@ -21,6 +21,7 @@ group :maintenance, optional: true do
 end
 
 group :test do
+	gem "async"
 	gem "sus"
 	gem "covered"
 	

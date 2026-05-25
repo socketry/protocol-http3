@@ -295,6 +295,7 @@ PLATFORMS
   arm64-darwin
 
 DEPENDENCIES
+  async
   bake-gem
   bake-modernize
   bake-releases
