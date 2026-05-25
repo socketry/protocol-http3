@@ -5,8 +5,6 @@
 #include "../QUIC/Bindings.hpp"
 
 #include <array>
-#include <cerrno>
-#include <sys/socket.h>
 #include <unordered_map>
 
 VALUE Ruby_Protocol_HTTP3_Dispatcher = Qnil;
@@ -63,36 +61,14 @@ namespace Ruby::Protocol::HTTP3 {
 
 			std::array<::Protocol::QUIC::Byte, 1024*64> buffer;
 			::Protocol::QUIC::Address remote_address;
-
-			iovec vector{
-				.iov_base = buffer.data(),
-				.iov_len = buffer.size(),
-			};
-
-			msghdr message{
-				.msg_name = &remote_address.data,
-				.msg_namelen = sizeof(remote_address.data),
-				.msg_iov = &vector,
-				.msg_iovlen = 1,
-			};
-
-			auto length = recvmsg(socket->descriptor(), &message, MSG_DONTWAIT);
-
-			if (length == -1) {
-				if (errno == EAGAIN || errno == EWOULDBLOCK) {
-					return Qnil;
-				}
-
-				rb_sys_fail("recvmsg");
-			}
-
-			remote_address.length = message.msg_namelen;
+			::Protocol::QUIC::ECN ecn = ::Protocol::QUIC::ECN::UNSPECIFIED;
+			auto length = socket->receive_packet(buffer.data(), buffer.size(), remote_address, ecn);
 
 			ngtcp2_version_cid version_cid;
 			auto result = ngtcp2_pkt_decode_version_cid(&version_cid, buffer.data(), length, ::Protocol::QUIC::DEFAULT_SCID_LENGTH);
 
 			if (result == 0) {
-				auto server = process_packet(*socket, remote_address, buffer.data(), length, ::Protocol::QUIC::ECN::UNSPECIFIED, version_cid);
+				auto server = process_packet(*socket, remote_address, buffer.data(), length, ecn, version_cid);
 
 				if (server) {
 					auto iterator = _servers.find(static_cast<::Protocol::HTTP3::Server *>(server));

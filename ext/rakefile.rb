@@ -8,5 +8,5 @@ task :default do
 	build_environment = {"RUBYLIBDIR" => ruby_library_directory}
 	
 	sh build_environment, "teapot", "fetch"
-	sh build_environment, "teapot", "Ruby/Protocol/HTTP3"
+	sh build_environment, "teapot", "scheduler-ruby-library", "Ruby/Protocol/HTTP3"
 end

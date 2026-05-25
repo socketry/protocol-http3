@@ -37,6 +37,7 @@ define_configuration "ruby-protocol-http3" do |configuration|
 	configuration.require "build-make"
 	configuration.require "build-cmake"
 	
+	configuration.require "scheduler-ruby"
 	configuration.require "protocol-http3"
 	configuration.require "ruby"
 	

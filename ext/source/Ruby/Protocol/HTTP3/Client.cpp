@@ -5,8 +5,6 @@
 #include <Protocol/HTTP3/Stream.hpp>
 
 #include <array>
-#include <cerrno>
-#include <sys/socket.h>
 #include <unordered_map>
 #include <vector>
 
@@ -297,32 +295,6 @@ static VALUE Ruby_Protocol_HTTP3_Client_receive(VALUE self, VALUE ruby_socket)
 {
 	auto client = Ruby_Protocol_HTTP3_Client_get(self);
 	auto socket = Ruby_Protocol_QUIC_Socket_get(ruby_socket);
-	std::array<Protocol::QUIC::Byte, 1024*64> buffer;
-	Protocol::QUIC::Address remote_address;
-
-	iovec vector{
-		.iov_base = buffer.data(),
-		.iov_len = buffer.size(),
-	};
-
-	msghdr message{
-		.msg_name = &remote_address.data,
-		.msg_namelen = sizeof(remote_address.data),
-		.msg_iov = &vector,
-		.msg_iovlen = 1,
-	};
-
-	auto length = recvmsg(socket->descriptor(), &message, MSG_DONTWAIT);
-
-	if (length == -1) {
-		if (errno == EAGAIN || errno == EWOULDBLOCK) {
-			return Qnil;
-		}
-
-		rb_sys_fail("recvmsg");
-	}
-
-	remote_address.length = message.msg_namelen;
 
 	auto path = ngtcp2_conn_get_path(client->native_handle());
 
@@ -330,25 +302,18 @@ static VALUE Ruby_Protocol_HTTP3_Client_receive(VALUE self, VALUE ruby_socket)
 		rb_raise(rb_eRuntimeError, "Could not get QUIC client path.");
 	}
 
-	ngtcp2_pkt_info packet_info{
-		.ecn = static_cast<std::uint8_t>(Protocol::QUIC::ECN::UNSPECIFIED),
-	};
+	auto status = client->receive_packets(*path, *socket);
 
-	auto result = ngtcp2_conn_read_pkt(client->native_handle(), path, &packet_info, buffer.data(), length, Protocol::QUIC::timestamp());
-
-	if (result < 0) {
-		auto status = client->handle_error(result, "ngtcp2_conn_read_pkt");
-
-		if (status == Protocol::QUIC::Connection::Status::CLOSING || status == Protocol::QUIC::Connection::Status::DRAINING) {
-			return Qfalse;
-		}
-
-		rb_raise(rb_eRuntimeError, "Could not read QUIC packet: %s", ngtcp2_strerror(result));
+	switch (status) {
+	case Protocol::QUIC::Connection::Status::OK:
+		client->send_packets();
+		return Qtrue;
+	case Protocol::QUIC::Connection::Status::CLOSING:
+	case Protocol::QUIC::Connection::Status::DRAINING:
+		return Qfalse;
+	default:
+		rb_raise(rb_eRuntimeError, "Could not receive QUIC packet.");
 	}
-
-	client->send_packets();
-
-	return Qtrue;
 }
 
 static VALUE Ruby_Protocol_HTTP3_Client_submit_request(VALUE self, VALUE headers)

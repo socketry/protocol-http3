@@ -77,3 +77,6 @@ openssl:
 coroutine-arm64:
   :commit: aada7d279a6c2ae79b6f8f3e45cfa44de3c432fe
   :branch: master
+scheduler-ruby:
+  :commit: 8e4e36bfd47485e8379b3d9c0e4258dec63b7320
+  :branch: main

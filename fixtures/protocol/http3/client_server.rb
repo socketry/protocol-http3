@@ -71,10 +71,6 @@ module Protocol::HTTP3::Fixtures
 		return socket
 	end
 	
-	def self.io_for(socket)
-		IO.for_fd(Protocol::HTTP3.file_descriptor(socket), autoclose: false)
-	end
-	
 	def self.exchange(configuration: Protocol::QUIC::Configuration.new)
 		server_socket = bound_socket(address)
 		local_address = server_socket.local_address
@@ -87,18 +83,14 @@ module Protocol::HTTP3::Fixtures
 		dispatcher.requests = requests
 		
 		Async do |task|
-			server_io = io_for(server_socket)
-			
 			server_task = task.async do
 				loop do
-					server_io.wait_readable
 					dispatcher.receive(server_socket)
 				end
 			end
 			
 			client_socket = Protocol::QUIC::Socket.new(local_address.family, ::Socket::SOCK_DGRAM, ::Socket::IPPROTO_UDP)
 			client_socket.connect(local_address)
-			client_io = io_for(client_socket)
 			
 			client = Protocol::HTTP3::TestClient.new(configuration, client_context, client_socket, local_address, 1)
 			client.responses = responses
@@ -107,7 +99,6 @@ module Protocol::HTTP3::Fixtures
 				client.send_packets
 				
 				loop do
-					client_io.wait_readable
 					break if client.receive(client_socket) == false
 				end
 			end

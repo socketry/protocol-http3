@@ -23,7 +23,7 @@ def build
 	
 	Dir.chdir(ext_path) do
 		system("teapot", "fetch")
-		system("teapot", "Ruby/Protocol/HTTP3")
+		system("teapot", "scheduler-ruby-library", "Ruby/Protocol/HTTP3")
 	end
 end
 
