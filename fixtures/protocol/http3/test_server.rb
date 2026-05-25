@@ -10,9 +10,12 @@ module Protocol::HTTP3
 		def initialize(...)
 			super
 			@request_headers = Hash.new{|hash, key| hash[key] = []}
+			@request_body = Hash.new{|hash, key| hash[key] = String.new}
+			@responded = {}
 		end
 		
 		attr_accessor :requests, :reported_request
+		attr_accessor :response_body
 		
 		def header_received(stream_id, name, value)
 			@request_headers[stream_id] << [name, value]
@@ -21,15 +24,34 @@ module Protocol::HTTP3
 		def headers_finished(stream_id, is_final)
 			return unless is_final
 			
+			respond(stream_id)
+		end
+		
+		def data_received(stream_id, chunk)
+			@request_body[stream_id] << chunk
+		end
+		
+		def stream_finished(stream_id)
+			respond(stream_id)
+		end
+		
+		def respond(stream_id)
+			return if @responded[stream_id]
+			
+			@responded[stream_id] = true
+			
 			unless reported_request
 				self.reported_request = true
-				requests&.push(@request_headers[stream_id])
+				requests&.push({
+					headers: @request_headers[stream_id],
+					body: @request_body[stream_id],
+				})
 			end
 			
 			submit_response(stream_id, [
 				[":status", "200"],
 				["server", "protocol-http3-test"],
-			])
+			], response_body)
 		end
 	end
 end

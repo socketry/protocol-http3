@@ -45,11 +45,14 @@ module HelloWorld
 				$stdout.puts "  #{name}: #{value}"
 			end
 			
+			body = "Hello World!\n"
+			
 			submit_response(stream_id, [
 				[":status", "200"],
 				["server", "protocol-http3"],
-				["x-message", "Hello World!"],
-			])
+				["content-type", "text/plain"],
+				["content-length", body.bytesize.to_s],
+			], body)
 		end
 	end
 	

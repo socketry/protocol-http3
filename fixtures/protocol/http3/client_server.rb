@@ -71,7 +71,7 @@ module Protocol::HTTP3::Fixtures
 		return socket
 	end
 	
-	def self.exchange(configuration: Protocol::QUIC::Configuration.new)
+	def self.exchange(configuration: Protocol::QUIC::Configuration.new, request_body: nil, response_body: nil)
 		server_socket = bound_socket(address)
 		local_address = server_socket.local_address
 		result = nil
@@ -81,6 +81,7 @@ module Protocol::HTTP3::Fixtures
 		
 		dispatcher = Protocol::HTTP3::TestDispatcher.new(configuration, server_context)
 		dispatcher.requests = requests
+		dispatcher.server_options[:response_body] = response_body
 		
 		Async do |task|
 			server_task = task.async do
@@ -94,6 +95,7 @@ module Protocol::HTTP3::Fixtures
 			
 			client = Protocol::HTTP3::TestClient.new(configuration, client_context, client_socket, local_address, 1)
 			client.responses = responses
+			client.request_body = request_body
 			
 			client_task = task.async do
 				client.send_packets
@@ -104,9 +106,14 @@ module Protocol::HTTP3::Fixtures
 			end
 			
 			task.with_timeout(10) do
+				request = requests.dequeue
+				response = responses.dequeue
+				
 				result = {
-					request_headers: requests.dequeue,
-					response_headers: responses.dequeue,
+					request_headers: request[:headers],
+					request_body: request[:body],
+					response_headers: response[:headers],
+					response_body: response[:body],
 				}
 			end
 		ensure

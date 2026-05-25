@@ -10,9 +10,11 @@ module Protocol::HTTP3
 		def initialize(...)
 			super
 			@response_headers = Hash.new{|hash, key| hash[key] = []}
+			@response_body = Hash.new{|hash, key| hash[key] = String.new}
 		end
 		
 		attr_accessor :responses, :reported_response
+		attr_accessor :request_body
 		
 		def handshake_completed
 			submit_request([
@@ -20,7 +22,7 @@ module Protocol::HTTP3
 				[":scheme", "https"],
 				[":authority", "localhost"],
 				[":path", "/"],
-			])
+			], request_body)
 		end
 		
 		def header_received(stream_id, name, value)
@@ -30,12 +32,28 @@ module Protocol::HTTP3
 		def headers_finished(stream_id, is_final)
 			return unless is_final
 			
-			unless reported_response
-				self.reported_response = true
-				responses&.push(@response_headers[stream_id])
-			end
+			report_response(stream_id)
 			
 			close
+		end
+		
+		def data_received(stream_id, chunk)
+			@response_body[stream_id] << chunk
+		end
+		
+		def stream_finished(stream_id)
+			report_response(stream_id)
+			close
+		end
+		
+		def report_response(stream_id)
+			return if reported_response
+			
+			self.reported_response = true
+			responses&.push({
+				headers: @response_headers[stream_id],
+				body: @response_body[stream_id],
+			})
 		end
 	end
 end

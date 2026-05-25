@@ -15,4 +15,18 @@ describe Protocol::HTTP3 do
 		expect(result[:response_headers]).to be(:include?, [":status", "200"])
 		expect(result[:response_headers]).to be(:include?, ["server", "protocol-http3-test"])
 	end
+	
+	it "can exchange an HTTP/3 response body using Async" do
+		result = Protocol::HTTP3::Fixtures.exchange(response_body: "Hello World!")
+		
+		expect(result[:response_headers]).to be(:include?, [":status", "200"])
+		expect(result[:response_body]).to be == "Hello World!"
+	end
+	
+	it "can exchange an HTTP/3 request body using Async" do
+		result = Protocol::HTTP3::Fixtures.exchange(request_body: "Hello Server!")
+		
+		expect(result[:request_headers]).to be(:include?, [":method", "GET"])
+		expect(result[:request_body]).to be == "Hello Server!"
+	end
 end
