@@ -8,6 +8,7 @@ source "https://rubygems.org"
 gemspec
 
 gem "teapot"
+gem "localhost"
 
 group :maintenance, optional: true do
 	gem "bake-gem"

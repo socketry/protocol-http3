@@ -316,6 +316,7 @@ DEPENDENCIES
   bake-test-external
   covered
   decode
+  localhost
   protocol-http3!
   rubocop
   rubocop-md
