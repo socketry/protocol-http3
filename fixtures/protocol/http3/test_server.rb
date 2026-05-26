@@ -12,6 +12,7 @@ module Protocol::HTTP3
 			@request_headers = Hash.new{|hash, key| hash[key] = []}
 			@request_body = Hash.new{|hash, key| hash[key] = String.new}
 			@responded = {}
+			@body_tasks = []
 		end
 		
 		attr_accessor :requests, :reported_request
@@ -48,10 +49,18 @@ module Protocol::HTTP3
 				})
 			end
 			
-			submit_response(stream_id, [
+			stream = submit_response(stream_id, [
 				[":status", "200"],
 				["server", "protocol-http3-test"],
 			], response_body)
+			
+			write_body(stream, response_body) if response_body
+		end
+		
+		def write_body(stream, body, parent: Async::Task.current)
+			@body_tasks << parent.async do
+				stream.write_body(body)
+			end
 		end
 	end
 end

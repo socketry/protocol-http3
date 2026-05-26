@@ -9,7 +9,7 @@ build-cmake:
   :commit: 6558fdad5bbb475f0fa5584ff773de8f12ff232e
   :branch: master
 protocol-http3:
-  :commit: d9e1c8bc9cb301d430fb48c3aec3b938a6446277
+  :commit: b7d3d4d1b1d6f6c089d2ec9986631bcfe2c373cf
   :branch: main
 ruby:
   :commit: 685cdd5a421dae7749f368d08add9aa9709ad043
@@ -48,7 +48,7 @@ executor-lldb:
   :commit: 193ba0b15c532d2745b0f0bfb05cd9581e869555
   :branch: master
 protocol-quic:
-  :commit: 1328f66a91ba7b3e544304dde8ba7bc93d3462ec
+  :commit: 5d069ac54f446f24dc95003543a2acaeef807e70
   :branch: main
 scheduler:
   :commit: 4d05a1631ac749106d268bda07425bf6ce0476dc
