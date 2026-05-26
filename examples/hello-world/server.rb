@@ -6,6 +6,7 @@
 
 require "async"
 require "localhost"
+require "protocol/http/body/buffered"
 require "protocol/http3"
 require "socket"
 
@@ -47,12 +48,22 @@ module HelloWorld
 			
 			body = "Hello World!\n"
 			
-			submit_response(stream_id, [
+			response_body = Protocol::HTTP::Body::Buffered.new([body])
+			
+			stream = submit_response(stream_id, [
 				[":status", "200"],
 				["server", "protocol-http3"],
 				["content-type", "text/plain"],
 				["content-length", body.bytesize.to_s],
-			], body)
+			], response_body)
+			
+			write_body(stream, response_body)
+		end
+		
+		def write_body(stream, body, parent: Async::Task.current)
+			parent.async do
+				stream.write_body(body)
+			end
 		end
 	end
 	

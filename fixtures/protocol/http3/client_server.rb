@@ -87,8 +87,10 @@ module Protocol::HTTP3::Fixtures
 			server_task = task.async do
 				loop do
 					dispatcher.receive(server_socket)
+					Async::Task.current.yield
 				end
 			end
+			server_task.transient = true
 			
 			client_socket = Protocol::QUIC::Socket.new(local_address.family, ::Socket::SOCK_DGRAM, ::Socket::IPPROTO_UDP)
 			client_socket.connect(local_address)
@@ -102,24 +104,40 @@ module Protocol::HTTP3::Fixtures
 				
 				loop do
 					break if client.receive(client_socket) == false
+					Async::Task.current.yield
 				end
 			end
+			client_task.transient = true
 			
 			task.with_timeout(10) do
-				request = requests.dequeue
-				response = responses.dequeue
+				result_task = task.async do
+					request = requests.dequeue
+					response = responses.dequeue
+					
+					{
+						request_headers: request[:headers],
+						request_body: request[:body],
+						response_headers: response[:headers],
+						response_body: response[:body],
+					}
+				end
 				
-				result = {
-					request_headers: request[:headers],
-					request_body: request[:body],
-					response_headers: response[:headers],
-					response_body: response[:body],
-				}
+				loop do
+					server_task.wait if server_task.failed?
+					client_task.wait if client_task.failed?
+					
+					if result_task.complete?
+						result = result_task.wait
+						break
+					end
+					
+					task.sleep(0.001)
+				end
 			end
 		ensure
-			client&.close
 			client_task&.stop
 			server_task&.stop
+			client&.close unless client_task&.failed?
 		end.wait
 		
 		return result

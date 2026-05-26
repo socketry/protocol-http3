@@ -1,96 +1,15 @@
 #include "Client.hpp"
+#include "Stream.hpp"
 
 #include "../QUIC/Bindings.hpp"
 
-#include <Protocol/HTTP3/Stream.hpp>
-
 #include <array>
-#include <deque>
-#include <memory>
-#include <string>
-#include <unordered_map>
+#include <stdexcept>
 #include <vector>
 
 VALUE Ruby_Protocol_HTTP3_Client = Qnil;
 
 namespace Ruby::Protocol::HTTP3 {
-	class BodyState {
-	public:
-		VALUE body;
-		nghttp3_data_reader reader;
-		std::deque<std::string> chunks;
-		std::size_t acknowledged = 0;
-		bool complete = false;
-
-		BodyState(VALUE body) : body(body), reader{read_data}
-		{
-		}
-
-		void acknowledge(std::size_t size)
-		{
-			acknowledged += size;
-
-			while (!chunks.empty() && acknowledged >= chunks.front().size()) {
-				acknowledged -= chunks.front().size();
-				chunks.pop_front();
-			}
-		}
-
-		void mark()
-		{
-			rb_gc_mark_movable(body);
-		}
-
-		void compact()
-		{
-			body = rb_gc_location(body);
-		}
-
-		static nghttp3_ssize read_data(nghttp3_conn *connection, std::int64_t stream_id, nghttp3_vec *vectors, std::size_t vector_count, std::uint32_t *flags, void *connection_data, void *stream_data)
-		{
-			(void)connection;
-			(void)stream_id;
-			(void)connection_data;
-
-			if (vector_count == 0) {
-				return 0;
-			}
-
-			auto body_state = reinterpret_cast<BodyState *>(stream_data);
-
-			if (!body_state || body_state->complete) {
-				*flags |= NGHTTP3_DATA_FLAG_EOF;
-				return 0;
-			}
-
-			VALUE chunk = Qnil;
-
-			if (rb_respond_to(body_state->body, rb_intern("read"))) {
-				chunk = rb_funcall(body_state->body, rb_intern("read"), 0);
-			} else {
-				chunk = body_state->body;
-				body_state->complete = true;
-				*flags |= NGHTTP3_DATA_FLAG_EOF;
-			}
-
-			if (NIL_P(chunk)) {
-				body_state->complete = true;
-				*flags |= NGHTTP3_DATA_FLAG_EOF;
-				return 0;
-			}
-
-			chunk = rb_str_to_str(chunk);
-			body_state->chunks.emplace_back(RSTRING_PTR(chunk), RSTRING_LEN(chunk));
-
-			auto & stored_chunk = body_state->chunks.back();
-
-			vectors[0].base = reinterpret_cast<std::uint8_t *>(stored_chunk.data());
-			vectors[0].len = stored_chunk.size();
-
-			return 1;
-		}
-	};
-
 	class Client final : public ::Protocol::QUIC::Client, public ::Protocol::HTTP3::Session {
 	public:
 		VALUE self;
@@ -100,8 +19,6 @@ namespace Ruby::Protocol::HTTP3 {
 		VALUE _tls_context;
 		VALUE _socket;
 		VALUE _remote_address;
-		std::unordered_map<::Protocol::QUIC::StreamID, VALUE> _streams;
-		std::unordered_map<::Protocol::QUIC::StreamID, std::unique_ptr<BodyState>> _bodies;
 
 	public:
 		Client(VALUE self, VALUE configuration, VALUE tls_context, VALUE socket, VALUE remote_address, VALUE chosen_version) :
@@ -133,7 +50,19 @@ namespace Ruby::Protocol::HTTP3 {
 
 		::Protocol::QUIC::Stream * create_stream(::Protocol::QUIC::StreamID stream_id) override
 		{
-			return new ::Protocol::HTTP3::Stream(*this, *this, stream_id);
+			return new Stream(*this, *this, stream_id);
+		}
+
+		Stream * stream_for(::Protocol::QUIC::StreamID stream_id)
+		{
+			auto stream = reinterpret_cast<::Protocol::QUIC::Stream *>(ngtcp2_conn_get_stream_user_data(::Protocol::QUIC::Client::native_handle(), stream_id));
+			auto ruby_stream = dynamic_cast<Stream *>(stream);
+
+			if (!ruby_stream) {
+				throw std::runtime_error("Could not find HTTP/3 stream.");
+			}
+
+			return ruby_stream;
 		}
 
 		::Protocol::QUIC::Connection::Status send_stream_data() override
@@ -145,7 +74,14 @@ namespace Ruby::Protocol::HTTP3 {
 				::Protocol::QUIC::StreamID stream_id = -1;
 				bool is_final = false;
 
-				auto vector_count = write_stream_data(stream_id, is_final, http_vectors.data(), http_vectors.size());
+				nghttp3_ssize vector_count = 0;
+
+				try {
+					vector_count = write_stream_data(stream_id, is_final, http_vectors.data(), http_vectors.size());
+				} catch (const std::system_error &) {
+					close_pending_streams();
+					return Status(NGTCP2_ERR_CALLBACK_FAILURE);
+				}
 
 				if (stream_id < 0) {
 					break;
@@ -178,11 +114,15 @@ namespace Ruby::Protocol::HTTP3 {
 					return Status(result);
 				}
 
-				add_write_offset(stream_id, static_cast<std::size_t>(written_length));
-
 				if (result > 0) {
 					send_packet(path_storage.path, packet_info, packet.data(), result);
 				}
+
+				if (written_length < 0) {
+					break;
+				}
+
+				add_write_offset(stream_id, static_cast<std::size_t>(written_length));
 
 				if (result == 0 && written_length == 0) {
 					break;
@@ -190,6 +130,10 @@ namespace Ruby::Protocol::HTTP3 {
 			}
 
 			return Status::OK;
+		}
+
+		void close_pending_streams()
+		{
 		}
 
 		void header_received(::Protocol::QUIC::StreamID stream_id, std::int32_t token, nghttp3_rcbuf *name, nghttp3_rcbuf *value, std::uint8_t flags, void *stream_data) override
@@ -228,8 +172,11 @@ namespace Ruby::Protocol::HTTP3 {
 		{
 			(void)stream_data;
 
+			auto stream = stream_for(stream_id);
+			stream->receive_input(data, size);
+
 			if (rb_respond_to(self, rb_intern("data_received"))) {
-				rb_funcall(self, rb_intern("data_received"), 2, RB_LL2NUM(stream_id), rb_str_new(reinterpret_cast<const char *>(data), size));
+				rb_funcall(self, rb_intern("data_received"), 2, RB_LL2NUM(stream_id), stream->shift_input());
 			}
 		}
 
@@ -237,19 +184,13 @@ namespace Ruby::Protocol::HTTP3 {
 		{
 			(void)stream_data;
 
-			auto iterator = _bodies.find(stream_id);
-
-			if (iterator != _bodies.end()) {
-				iterator->second->acknowledge(size);
-			}
+			stream_for(stream_id)->acknowledge_output(size);
 		}
 
 		void stream_closed(::Protocol::QUIC::StreamID stream_id, std::uint64_t error_code, void *stream_data) override
 		{
 			(void)error_code;
 			(void)stream_data;
-
-			_bodies.erase(stream_id);
 		}
 
 		void settings_received(const nghttp3_proto_settings *settings) override
@@ -265,6 +206,8 @@ namespace Ruby::Protocol::HTTP3 {
 		{
 			(void)stream_data;
 
+			stream_for(stream_id)->finish_input();
+
 			if (rb_respond_to(self, rb_intern("stream_finished"))) {
 				rb_funcall(self, rb_intern("stream_finished"), 1, RB_LL2NUM(stream_id));
 			}
@@ -273,8 +216,6 @@ namespace Ruby::Protocol::HTTP3 {
 		void disconnect() override
 		{
 			::Protocol::QUIC::Client::disconnect();
-			_streams.clear();
-			_bodies.clear();
 		}
 
 		void mark()
@@ -285,14 +226,12 @@ namespace Ruby::Protocol::HTTP3 {
 			rb_gc_mark_movable(_socket);
 			rb_gc_mark_movable(_remote_address);
 
-			for (auto & [stream_id, stream] : _streams) {
+			for (auto & [stream_id, stream] : ::Protocol::QUIC::Connection::_streams) {
 				(void)stream_id;
-				rb_gc_mark_movable(stream);
-			}
 
-			for (auto & [stream_id, body] : _bodies) {
-				(void)stream_id;
-				body->mark();
+				if (auto ruby_stream = dynamic_cast<Stream *>(stream)) {
+					ruby_stream->mark();
+				}
 			}
 		}
 
@@ -304,14 +243,12 @@ namespace Ruby::Protocol::HTTP3 {
 			_socket = rb_gc_location(_socket);
 			_remote_address = rb_gc_location(_remote_address);
 
-			for (auto & [stream_id, stream] : _streams) {
+			for (auto & [stream_id, stream] : ::Protocol::QUIC::Connection::_streams) {
 				(void)stream_id;
-				stream = rb_gc_location(stream);
-			}
 
-			for (auto & [stream_id, body] : _bodies) {
-				(void)stream_id;
-				body->compact();
+				if (auto ruby_stream = dynamic_cast<Stream *>(stream)) {
+					ruby_stream->compact();
+				}
 			}
 		}
 
@@ -320,12 +257,41 @@ namespace Ruby::Protocol::HTTP3 {
 			if (NIL_P(body)) {
 				submit_request(stream_id, headers, count);
 			} else {
-				auto body_state = std::make_unique<BodyState>(body);
-				auto *body_state_pointer = body_state.get();
-				_bodies.emplace(stream_id, std::move(body_state));
-
-				submit_request(stream_id, headers, count, &body_state_pointer->reader, body_state_pointer);
+				auto stream = stream_for(stream_id);
+				submit_request(stream_id, headers, count, stream->reader(), stream);
 			}
+		}
+
+		void append_body(::Protocol::QUIC::StreamID stream_id, VALUE chunk)
+		{
+			auto stream = stream_for(stream_id);
+			auto was_empty = !stream->output_pending();
+
+			stream->append_output(chunk);
+
+			if (was_empty) {
+				resume_stream(stream_id);
+			}
+		}
+
+		void finish_body(::Protocol::QUIC::StreamID stream_id)
+		{
+			auto stream = stream_for(stream_id);
+			auto was_empty = !stream->output_pending();
+
+			stream->finish_output();
+
+			if (was_empty) {
+				resume_stream(stream_id);
+			}
+		}
+
+		void reset_body(::Protocol::QUIC::StreamID stream_id, std::uint64_t error_code)
+		{
+			stream_for(stream_id)->reset_output();
+			shutdown_stream_write(stream_id);
+			close_stream(stream_id, error_code);
+			ngtcp2_conn_shutdown_stream_write(::Protocol::QUIC::Client::native_handle(), 0, stream_id, error_code);
 		}
 	};
 
@@ -439,6 +405,7 @@ static VALUE Ruby_Protocol_HTTP3_Client_receive(VALUE self, VALUE ruby_socket)
 	switch (status) {
 	case Protocol::QUIC::Connection::Status::OK:
 		client->send_packets();
+
 		return Qtrue;
 	case Protocol::QUIC::Connection::Status::CLOSING:
 	case Protocol::QUIC::Connection::Status::DRAINING:
@@ -485,6 +452,45 @@ static VALUE Ruby_Protocol_HTTP3_Client_submit_request(int argc, VALUE *argv, VA
 	return RB_LL2NUM(stream_id);
 }
 
+static VALUE Ruby_Protocol_HTTP3_Client_write_body_chunk(VALUE self, VALUE stream_id, VALUE chunk)
+{
+	auto client = Ruby_Protocol_HTTP3_Client_native_get(self);
+
+	client->append_body(RB_NUM2LL(stream_id), chunk);
+
+	return Qnil;
+}
+
+static VALUE Ruby_Protocol_HTTP3_Client_read_body_chunk(VALUE self, VALUE stream_id)
+{
+	auto client = Ruby_Protocol_HTTP3_Client_native_get(self);
+
+	return client->stream_for(RB_NUM2LL(stream_id))->shift_input();
+}
+
+static VALUE Ruby_Protocol_HTTP3_Client_finish_body(VALUE self, VALUE stream_id)
+{
+	auto client = Ruby_Protocol_HTTP3_Client_native_get(self);
+
+	client->finish_body(RB_NUM2LL(stream_id));
+
+	return Qnil;
+}
+
+static VALUE Ruby_Protocol_HTTP3_Client_reset_body(int argc, VALUE *argv, VALUE self)
+{
+	VALUE stream_id;
+	VALUE error_code;
+	rb_scan_args(argc, argv, "11", &stream_id, &error_code);
+
+	auto client = Ruby_Protocol_HTTP3_Client_native_get(self);
+	auto native_error_code = NIL_P(error_code) ? NGHTTP3_H3_INTERNAL_ERROR : RB_NUM2ULL(error_code);
+
+	client->reset_body(RB_NUM2LL(stream_id), native_error_code);
+
+	return Qnil;
+}
+
 void Init_Ruby_Protocol_HTTP3_Client(VALUE Protocol_HTTP3)
 {
 	Ruby_Protocol_HTTP3_Client = rb_define_class_under(Protocol_HTTP3, "Client", rb_cObject);
@@ -497,4 +503,8 @@ void Init_Ruby_Protocol_HTTP3_Client(VALUE Protocol_HTTP3)
 	rb_define_method(Ruby_Protocol_HTTP3_Client, "send_packets", Ruby_Protocol_HTTP3_Client_send_packets, 0);
 	rb_define_method(Ruby_Protocol_HTTP3_Client, "receive", Ruby_Protocol_HTTP3_Client_receive, 1);
 	rb_define_method(Ruby_Protocol_HTTP3_Client, "submit_request", RUBY_METHOD_FUNC(Ruby_Protocol_HTTP3_Client_submit_request), -1);
+	rb_define_method(Ruby_Protocol_HTTP3_Client, "write_body_chunk", Ruby_Protocol_HTTP3_Client_write_body_chunk, 2);
+	rb_define_method(Ruby_Protocol_HTTP3_Client, "read_body_chunk", Ruby_Protocol_HTTP3_Client_read_body_chunk, 1);
+	rb_define_method(Ruby_Protocol_HTTP3_Client, "finish_body", Ruby_Protocol_HTTP3_Client_finish_body, 1);
+	rb_define_method(Ruby_Protocol_HTTP3_Client, "reset_body", RUBY_METHOD_FUNC(Ruby_Protocol_HTTP3_Client_reset_body), -1);
 }
