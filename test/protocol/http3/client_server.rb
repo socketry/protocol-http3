@@ -120,6 +120,14 @@ describe Protocol::HTTP3 do
 		expect(body.reads).to be == 4
 	end
 	
+	it "can exchange sequential requests on one HTTP/3 connection" do
+		results = Protocol::HTTP3::Fixtures.exchange_reusing_client(count: 2)
+		
+		expect(results.size).to be == 2
+		expect(results[0][:request_headers]).to be(:include?, [":path", "/"])
+		expect(results[1][:request_headers]).to be(:include?, [":path", "/1"])
+	end
+	
 	it "duplicates output chunks before retaining them" do
 		body = ReusedStringBody.new("Hello", " ", "World!")
 		result = Protocol::HTTP3::Fixtures.exchange(response_body: body)

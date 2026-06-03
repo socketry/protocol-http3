@@ -254,10 +254,11 @@ namespace Ruby::Protocol::HTTP3 {
 
 		void submit_request_with_body(::Protocol::QUIC::StreamID stream_id, const nghttp3_nv *headers, std::size_t count, VALUE body)
 		{
+			auto stream = stream_for(stream_id);
+			
 			if (NIL_P(body)) {
-				submit_request(stream_id, headers, count);
+				submit_request(stream_id, headers, count, nullptr, stream);
 			} else {
-				auto stream = stream_for(stream_id);
 				submit_request(stream_id, headers, count, stream->reader(), stream);
 			}
 		}

@@ -12,20 +12,15 @@ module Protocol::HTTP3
 			@response_headers = Hash.new{|hash, key| hash[key] = []}
 			@response_body = Hash.new{|hash, key| hash[key] = String.new}
 			@body_tasks = []
+			@close_after_response = true
 		end
 		
 		attr_accessor :responses, :reported_response
 		attr_accessor :request_body
+		attr_accessor :close_after_response
 		
 		def handshake_completed
-			stream = submit_request([
-				[":method", "GET"],
-				[":scheme", "https"],
-				[":authority", "localhost"],
-				[":path", "/"],
-			], request_body)
-			
-			write_body(stream, request_body) if request_body
+			submit_test_request("/")
 		end
 		
 		def header_received(stream_id, name, value)
@@ -35,9 +30,10 @@ module Protocol::HTTP3
 		def headers_finished(stream_id, is_final)
 			return unless is_final
 			
-			report_response(stream_id)
-			
-			close
+			if close_after_response
+				report_response(stream_id)
+				close
+			end
 		end
 		
 		def data_received(stream_id, chunk)
@@ -46,11 +42,11 @@ module Protocol::HTTP3
 		
 		def stream_finished(stream_id)
 			report_response(stream_id)
-			close
+			close if close_after_response
 		end
 		
 		def report_response(stream_id)
-			return if reported_response
+			return if reported_response && close_after_response
 			
 			self.reported_response = true
 			responses&.push({
@@ -63,6 +59,19 @@ module Protocol::HTTP3
 			@body_tasks << parent.async do
 				stream.write_body(body)
 			end
+		end
+		
+		def submit_test_request(path, body = request_body)
+			stream = submit_request([
+				[":method", "GET"],
+				[":scheme", "https"],
+				[":authority", "localhost"],
+				[":path", path],
+			], body)
+			
+			write_body(stream, body) if body
+			
+			return stream
 		end
 	end
 end

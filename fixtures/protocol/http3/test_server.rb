@@ -13,10 +13,12 @@ module Protocol::HTTP3
 			@request_body = Hash.new{|hash, key| hash[key] = String.new}
 			@responded = {}
 			@body_tasks = []
+			@report_all_requests = false
 		end
 		
 		attr_accessor :requests, :reported_request
 		attr_accessor :response_body
+		attr_accessor :report_all_requests
 		
 		def header_received(stream_id, name, value)
 			@request_headers[stream_id] << [name, value]
@@ -41,7 +43,7 @@ module Protocol::HTTP3
 			
 			@responded[stream_id] = true
 			
-			unless reported_request
+			if report_all_requests || !reported_request
 				self.reported_request = true
 				requests&.push({
 					headers: @request_headers[stream_id],
