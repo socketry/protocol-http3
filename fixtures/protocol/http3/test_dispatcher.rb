@@ -20,6 +20,7 @@ module Protocol::HTTP3
 			server = TestServer.new(self, configuration, tls_context, socket, address, packet_header, nil)
 			server.requests = requests
 			server.response_body = server_options[:response_body]
+			server.report_all_requests = server_options[:report_all_requests]
 			return server
 		end
 	end

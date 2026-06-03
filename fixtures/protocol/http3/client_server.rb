@@ -142,4 +142,66 @@ module Protocol::HTTP3::Fixtures
 		
 		return result
 	end
+	
+	def self.exchange_reusing_client(configuration: Protocol::QUIC::Configuration.new, count: 2)
+		server_socket = bound_socket(address)
+		local_address = server_socket.local_address
+		results = []
+		
+		requests = Async::Queue.new
+		responses = Async::Queue.new
+		
+		dispatcher = Protocol::HTTP3::TestDispatcher.new(configuration, server_context)
+		dispatcher.requests = requests
+		dispatcher.server_options[:report_all_requests] = true
+		
+		Async do |task|
+			server_task = task.async do
+				loop do
+					dispatcher.receive(server_socket)
+					Async::Task.current.yield
+				end
+			end
+			server_task.transient = true
+			
+			client_socket = Protocol::QUIC::Socket.new(local_address.family, ::Socket::SOCK_DGRAM, ::Socket::IPPROTO_UDP)
+			client_socket.connect(local_address)
+			
+			client = Protocol::HTTP3::TestClient.new(configuration, client_context, client_socket, local_address, 1)
+			client.responses = responses
+			client.close_after_response = false
+			
+			client_task = task.async do
+				client.send_packets
+				
+				loop do
+					break if client.receive(client_socket) == false
+					Async::Task.current.yield
+				end
+			end
+			client_task.transient = true
+			
+			task.with_timeout(10) do
+				count.times do |index|
+					request = requests.dequeue
+					response = responses.dequeue
+					
+					results << {
+						request_headers: request[:headers],
+						request_body: request[:body],
+						response_headers: response[:headers],
+						response_body: response[:body],
+					}
+					
+					client.submit_test_request("/#{index + 1}") if index < count - 1
+				end
+			end
+		ensure
+			client_task&.stop
+			server_task&.stop
+			client&.close unless client_task&.failed?
+		end.wait
+		
+		return results
+	end
 end
