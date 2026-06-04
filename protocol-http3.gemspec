@@ -29,7 +29,7 @@ Gem::Specification.new do |spec|
 	spec.required_ruby_version = ">= 3.3"
 	
 	spec.add_dependency "protocol-http", "~> 0.62"
-	spec.add_dependency "protocol-quic", "~> 0.0.8"
+	spec.add_dependency "protocol-quic", "~> 0.0.9"
 	spec.add_dependency "teapot", "~> 3.5"
 	spec.add_dependency "rake"
 end
