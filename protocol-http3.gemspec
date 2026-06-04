@@ -21,7 +21,7 @@ Gem::Specification.new do |spec|
 		"funding_uri" => "https://github.com/sponsors/ioquatix",
 	}
 	
-	spec.files = Dir["{lib,ext/source}/**/*", "*.md", "ext/*.*", base: __dir__]
+	spec.files = Dir["lib/**/*.rb", "ext/source/**/*.{cpp,hpp}", "*.md", "ext/rakefile.rb", "ext/teapot.rb", "ext/*-lock.yml", base: __dir__]
 	spec.require_paths = ["lib"]
 	
 	spec.extensions = ["ext/rakefile.rb"]
@@ -29,7 +29,7 @@ Gem::Specification.new do |spec|
 	spec.required_ruby_version = ">= 3.3"
 	
 	spec.add_dependency "protocol-http", "~> 0.62"
-	spec.add_dependency "protocol-quic", "~> 0.0.5"
+	spec.add_dependency "protocol-quic", "~> 0.0.8"
 	spec.add_dependency "teapot", "~> 3.5"
 	spec.add_dependency "rake"
 end

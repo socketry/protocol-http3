@@ -8,5 +8,6 @@
 
 /ext/teapot
 /lib/Protocol_HTTP3.*
+/lib/Ruby_Protocol_HTTP3.bundle
 compile_commands.json
 .cache

@@ -6,11 +6,12 @@
 require "rbconfig"
 require "rubygems"
 
+TEAPOT = [RbConfig.ruby, Gem.bin_path("teapot", "teapot")]
+
 task :default do
 	ruby_library_directory = ENV.fetch("RUBYLIBDIR"){ENV.fetch("RUBYARCHDIR")}
 	build_environment = {"RUBYLIBDIR" => ruby_library_directory}
-	teapot = [RbConfig.ruby, Gem.bin_path("teapot", "teapot")]
 	
-	sh build_environment, *teapot, "fetch"
-	sh build_environment, *teapot, "scheduler-ruby-library", "Ruby/Protocol/HTTP3"
+	sh build_environment, *TEAPOT, "fetch"
+	sh build_environment, *TEAPOT, "scheduler-ruby-library", "Ruby/Protocol/HTTP3"
 end
